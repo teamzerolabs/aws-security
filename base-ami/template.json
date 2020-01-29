@@ -1,0 +1,62 @@
+{
+  "variables": {
+    "aws_access_key": "",
+    "aws_secret_key": ""
+  },
+  "builders": [
+    {
+      "type": "amazon-ebs",
+      "access_key": "{{ user `aws_access_key` }}",
+      "secret_key": "{{ user `aws_secret_key` }}",
+      "region": "us-west-2",
+      "instance_type": "t2.micro",
+      "ssh_username": "ubuntu",
+      "source_ami_filter": {
+        "filters": {
+          "virtualization-type": "hvm",
+          "name": "ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*",
+          "root-device-type": "ebs"
+        },
+        "owners": [
+          "099720109477"
+        ],
+        "most_recent": true
+      },
+      "ami_name": "tzl-base {{timestamp}}"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "file",
+      "source": "files/sssd.conf",
+      "destination": "/tmp/sssd.conf"
+    },
+    {
+      "type": "file",
+      "source": "files/10-jumpcloud",
+      "destination": "/tmp/10-jumpcloud"
+    },
+    {
+      "type": "file",
+      "source": "files/sshd_config",
+      "destination": "/tmp/sshd_config"
+    },
+    {
+      "type": "file",
+      "source": "files/sshd",
+      "destination": "/tmp/sshd"
+    },
+    {
+      "type": "shell",
+      "execute_command": "sudo -S sh -c '{{ .Vars }} {{ .Path }}'",
+      "inline": [
+        "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y libpam-sss libnss-sss sssd-tools",
+        "mv /tmp/sssd.conf /etc/sssd/sssd.conf && chmod 600 /etc/sssd/sssd.conf && chown root.root /etc/sssd/sssd.conf",
+        "mv /tmp/10-jumpcloud /etc/sudoers.d/10-jumpcloud && chmod 600 /etc/sudoers.d/10-jumpcloud && chown root.root /etc/sudoers.d/10-jumpcloud",
+        "mv /tmp/sshd_config /etc/ssh/sshd_config && chmod 600 /etc/ssh/sshd_config && chown root.root /etc/ssh/sshd_config",
+        "mv /tmp/sshd /etc/pam.d/sshd && chmod 600 /etc/pam.d/sshd && chown root.root /etc/pam.d/sshd",
+        "systemctl enable sssd"
+      ]
+    }
+  ]
+}
